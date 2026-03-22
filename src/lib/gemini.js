@@ -1,4 +1,4 @@
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-flash-latest'
 
 export function getApiKey() {
   return import.meta.env.VITE_GEMINI_KEY || ''
