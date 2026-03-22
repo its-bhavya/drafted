@@ -27,7 +27,7 @@ export default function Toolbar({ projectName, diagram, theme, onThemeToggle, ca
       <div className={styles.left}>
         <div className={styles.logo}>
           <span className={styles.logoDot} />
-          SysVoice
+          Drafted
         </div>
         {projectName && <span className={styles.projectName}>{projectName}</span>}
       </div>
