@@ -1,4 +1,4 @@
-# SysVoice — Voice System Design Diagram
+# Drafted — Voice System Design Diagram
 
 Speak or type your system design — watch the diagram build in real time.
 
