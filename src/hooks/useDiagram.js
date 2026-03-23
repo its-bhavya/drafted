@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { generateDiagram } from '../lib/gemini'
+import { generateDiagram, resetConversation } from '../lib/gemini'
 import { autoLayout } from '../lib/layout'
 
 const EMPTY = { nodes: [], edges: [], nextId: 1 }
@@ -9,21 +9,21 @@ function withLayout(diagram) {
 }
 
 export function useDiagram(initialDiagram = EMPTY) {
-  const [diagram, setDiagram] = useState(() => 
-    initialDiagram.nodes?.length ? initialDiagram : EMPTY
-  )
+  const [diagram, setDiagram]   = useState(() => initialDiagram.nodes?.length ? initialDiagram : EMPTY)
   const [history, setHistory]   = useState([])
   const [status, setStatus]     = useState({ text: 'Ready', type: 'idle' })
+  const [pending, setPending]   = useState(null)  // pending diagram awaiting confirmation
 
   const snapshot = useCallback((current) => {
     setHistory(h => [...h.slice(-29), JSON.stringify(current)])
   }, [])
 
-  // Reset diagram when project switches
   const reset = useCallback((newDiagram = EMPTY) => {
     setDiagram(newDiagram.nodes?.length ? newDiagram : EMPTY)
     setHistory([])
+    setPending(null)
     setStatus({ text: 'Ready', type: 'idle' })
+    resetConversation()  // clear Gemini history on project switch
   }, [])
 
   const applyDiagram = useCallback((incoming, current) => {
@@ -58,8 +58,37 @@ export function useDiagram(initialDiagram = EMPTY) {
     return withLayout(next)
   }, [])
 
+  // Streaming partial update — fires while user is still speaking
+  // Shows a "preview" by applying directly but marking it as streaming
+  const processPartial = useCallback(async (text) => {
+    setStatus({ text: `Updating… "${text.slice(-40)}"`, type: 'streaming' })
+    try {
+      const incoming = await generateDiagram(text, { nodes: diagram.nodes, edges: diagram.edges })
+      setDiagram(current => applyDiagram(incoming, current))
+      setStatus({ text: 'Listening…', type: 'streaming' })
+    } catch (_) {
+      // Silently ignore streaming errors — final result will retry
+    }
+  }, [diagram, applyDiagram])
+
+  // Final update — fires on Stop, snapshots for undo
+  const processFinal = useCallback(async (text) => {
+    setStatus({ text: 'Finalising…', type: 'loading' })
+    try {
+      const incoming = await generateDiagram(text, { nodes: diagram.nodes, edges: diagram.edges })
+      setDiagram(current => {
+        snapshot(current)
+        return applyDiagram(incoming, current)
+      })
+      setStatus({ text: 'Updated ✓', type: 'success' })
+    } catch (err) {
+      setStatus({ text: 'Error: ' + err.message, type: 'error' })
+    }
+  }, [diagram, snapshot, applyDiagram])
+
+  // Text input — same as final
   const process = useCallback(async (text) => {
-    setStatus({ text: 'Thinking...', type: 'loading' })
+    setStatus({ text: 'Thinking…', type: 'loading' })
     try {
       const incoming = await generateDiagram(text, { nodes: diagram.nodes, edges: diagram.edges })
       setDiagram(current => {
@@ -84,6 +113,7 @@ export function useDiagram(initialDiagram = EMPTY) {
 
   const clear = useCallback(() => {
     setDiagram(current => { snapshot(current); return EMPTY })
+    resetConversation()
     setStatus({ text: 'Cleared', type: 'idle' })
   }, [snapshot])
 
@@ -97,7 +127,13 @@ export function useDiagram(initialDiagram = EMPTY) {
       return newDiagram
     })
   }, [snapshot])
-return { diagram, status, process, undo, clear, reset, updateNodePosition, setDiagram: applyManualChange, canUndo: history.length > 0 }
-}
 
-// Exported separately so App can pass it to DiagramCanvas
+  return {
+    diagram, status, pending,
+    process, processPartial, processFinal,
+    undo, clear, reset,
+    updateNodePosition,
+    setDiagram: applyManualChange,
+    canUndo: history.length > 0,
+  }
+}

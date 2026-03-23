@@ -32,7 +32,7 @@ export default function App() {
 
   const activeProject = projects.find(p => p.id === activeId)
 
-  const { diagram, status, process, undo, clear, reset, updateNodePosition, setDiagram, canUndo } =
+  const { diagram, status, process, processPartial, processFinal, undo, clear, reset, updateNodePosition, setDiagram, canUndo } =
     useDiagram(activeProject?.diagram)
 
   // Save diagram to project whenever it changes
@@ -105,7 +105,7 @@ export default function App() {
         </main>
       </div>
 
-      <InputBar onSubmit={process} status={status} />
+      <InputBar onSubmit={process} onPartial={processPartial} onFinal={processFinal} status={status} />
     </div>
   )
 }

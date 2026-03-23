@@ -4,6 +4,14 @@ export function getApiKey() {
   return import.meta.env.VITE_GEMINI_KEY || ''
 }
 
+// Conversation history for ambiguity handling
+// Each entry: { role: 'user'|'model', parts: [{ text }] }
+let conversationHistory = []
+
+export function resetConversation() {
+  conversationHistory = []
+}
+
 export async function generateDiagram(userText, currentState) {
   const apiKey = getApiKey()
   if (!apiKey) throw new Error('No API key — add VITE_GEMINI_KEY to your .env file')
@@ -13,18 +21,30 @@ export async function generateDiagram(userText, currentState) {
     edges: currentState.edges,
   }
 
-  const prompt = `You are a JSON-only system design diagram API. Output ONLY a single JSON object. No prose, no explanation, no markdown, no code fences. Your entire response must start with { and end with }.
+  const systemInstruction = `You are a JSON-only system design diagram API. Output ONLY a single JSON object. No prose, no explanation, no markdown, no code fences. Your entire response must start with { and end with }.
 
 Schema:
 {"patch":false,"nodes":[{"id":"1","label":"Name","sub":"optional","type":"service","x":0,"y":0}],"edges":[{"from":"1","to":"2","label":"optional"}]}
 
 Types: service, database, queue, client, gateway
 Positions: set x and y to 0 for all nodes — layout is handled client-side.
-patch:true = add/modify existing diagram (new nodes only, new IDs starting at 100+).
+patch:true = add/modify/correct the existing diagram (only include changed nodes+edges, new IDs start at 100+).
 patch:false = full replacement.
 
-CURRENT: ${JSON.stringify(trimmedState)}
-INSTRUCTION: "${userText}"`
+IMPORTANT: You have conversation history. If the user says "actually", "wait", "no", "instead", "scratch that", or corrects themselves mid-sentence — interpret it as a correction to the previous instruction and apply the corrected intent only.
+
+CURRENT DIAGRAM: ${JSON.stringify(trimmedState)}`
+
+  // Add user message to history
+  conversationHistory.push({
+    role: 'user',
+    parts: [{ text: userText }],
+  })
+
+  // Keep history bounded to last 10 exchanges (20 messages)
+  if (conversationHistory.length > 20) {
+    conversationHistory = conversationHistory.slice(-20)
+  }
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
@@ -32,7 +52,8 @@ INSTRUCTION: "${userText}"`
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: conversationHistory,
         generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
       }),
     }
@@ -41,9 +62,15 @@ INSTRUCTION: "${userText}"`
   const data = await res.json()
   if (data.error) throw new Error(data.error.message)
 
-  let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
+  // Add model response to history so next turn has context
+  conversationHistory.push({
+    role: 'model',
+    parts: [{ text: rawText }],
+  })
+
+  let raw = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
   console.debug('[gemini] raw:', raw)
 
   const start = raw.indexOf('{')

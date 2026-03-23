@@ -6,7 +6,7 @@
 
 ## Live Demo
 
-🔗 [drafted-six.vercel.app](https://drafted-six.vercel.app) 
+🔗 [drafted.vercel.app](https://drafted.vercel.app) *(update this with your deployed URL)*
 
 ---
 
@@ -27,7 +27,7 @@
 ## How it works
 
 1. Your speech is transcribed locally in the browser using the **Web Speech API** — nothing is sent to a server for transcription.
-2. The transcript (plus the current diagram state) is sent to the latest **Gemini Flash Model** via the Google Generative Language API.
+2. The transcript (plus the current diagram state) is sent to **Gemini 2.0 Flash** via the Google Generative Language API.
 3. Gemini returns a JSON object describing the nodes and edges to add or replace.
 4. The JSON is parsed, merged into the current diagram state, and run through a **layered auto-layout engine** (Kahn's algorithm + barycenter ordering) to produce clean non-overlapping positions.
 5. The diagram is rendered as **absolutely positioned HTML nodes** with **SVG edges** drawn between their borders.
@@ -40,7 +40,7 @@
 | Layer | Technology |
 |---|---|
 | Framework | React 18 + Vite |
-| AI | Gemini Flash (Currently 3.0) (Google Generative Language API) |
+| AI | Gemini 2.0 Flash (Google Generative Language API) |
 | Speech | Web Speech API (browser-native) |
 | Layout | Custom layered graph engine |
 | Rendering | HTML + SVG |
@@ -56,7 +56,7 @@
 
 **1. Clone the repo**
 ```bash
-git clone https://github.com/its-bhavya/drafted.git
+git clone https://github.com/yourname/drafted.git
 cd drafted
 ```
 
@@ -72,7 +72,7 @@ Create a `.env` file in the project root:
 VITE_GEMINI_KEY=AIzaSy...
 ```
 
-Get a free key at [aistudio.google.com](https://aistudio.google.com) — no billing required for Gemini Flash on the free tier.
+Get a free key at [aistudio.google.com](https://aistudio.google.com) — no billing required for Gemini 2.0 Flash on the free tier.
 
 **4. Run the dev server**
 ```bash
